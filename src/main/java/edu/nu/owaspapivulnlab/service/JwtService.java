@@ -14,8 +14,9 @@ public class JwtService {
     @Value("${app.jwt.secret}")
     private String secret;
 
-    @Value("${app.jwt.ttl-seconds}")
-    private long ttlSeconds;
+    // FIXED CODE
+    @Value("${app.jwt.ttl_ms}")
+    private long ttl;
 
     // VULNERABILITY(API8): HS256 with trivial key, long TTL, missing issuer/audience
     public String issue(String subject, Map<String, Object> claims) {
@@ -24,7 +25,8 @@ public class JwtService {
                 .setSubject(subject)
                 .addClaims(claims)
                 .setIssuedAt(new Date(now))
-                .setExpiration(new Date(now + ttlSeconds * 1000))
+                // FIXED CODE
+                .setExpiration(new Date(now + ttl))
                 .signWith(SignatureAlgorithm.HS256, secret.getBytes())
                 .compact();
     }

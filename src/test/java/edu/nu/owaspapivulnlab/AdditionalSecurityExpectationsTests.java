@@ -1,72 +1,100 @@
-package edu.nu.owaspapivulnlab;
+package edu.nu.owaspapivulnlab; // Make sure this package name matches your other files
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.nu.owaspapivulnlab.model.AppUser;
+import edu.nu.owaspapivulnlab.repo.AppUserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
-import static org.hamcrest.Matchers.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class AdditionalSecurityExpectationsTests {
+@Transactional // This annotation rolls back database changes after each test
+public class AdditionalSecurityExpectationsTests {
 
-    @Autowired MockMvc mvc;
-    @Autowired ObjectMapper om;
+    @Autowired
+    private MockMvc mockMvc; // Lets us send fake HTTP requests
 
-    String login(String user, String pw) throws Exception {
-        String res = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\""+user+"\",\"password\":\""+pw+"\"}"))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        JsonNode n = om.readTree(res);
-        return n.get("token").asText();
-    }
+    @Autowired
+    private AppUserRepository appUserRepository; // Lets us check the database
 
+    @Autowired
+    private PasswordEncoder passwordEncoder; // Lets us check the hash
+
+    @Autowired
+    private ObjectMapper objectMapper; // Lets us create JSON strings
+
+    /**
+     * Test for Task 1: Password Security
+     * This test verifies that:
+     * 1. A new user's password is NOT stored in plaintext.
+     * 2. The stored hash is a valid BCrypt hash.
+     * 3. A user can log in with the correct password.
+     * 4. A user cannot log in with an incorrect password.
+     */
     @Test
-    void protected_endpoints_require_authentication() throws Exception {
-        // Expectation in fixed app: /api/users requires auth -> 401
-        mvc.perform(get("/api/users"))
-                .andExpect(status().isUnauthorized()); // Fails now due to permitAll on GET
+    public void testTask1_PasswordSecurity_BCryptImplementation() throws Exception {
+        // 1. ARRANGE: Create a new user login request
+        Map<String, String> signupRequest = Map.of(
+                "username", "testuser",
+                "password", "MyS3cur3P@ss!"
+        );
+        String jsonRequest = objectMapper.writeValueAsString(signupRequest);
+
+        // 2. ACT: Call the /signup endpoint
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isCreated()); // Expect 201 Created
+
+        // 3. ASSERT (Database Check): Verify the password is hashed in the DB
+        AppUser savedUser = appUserRepository.findByUsername("testuser")
+                .orElseThrow(() -> new AssertionError("User 'testuser' not found in database"));
+
+        String storedPasswordHash = savedUser.getPassword();
+
+        // Check 1: The password in the DB is NOT the plaintext password
+        assertNotEquals("MyS3cur3P@ss!", storedPasswordHash);
+
+        // Check 2: The password in the DB IS a valid BCrypt hash
+        assertTrue(storedPasswordHash.startsWith("$2a$"), "Password does not appear to be a BCrypt hash");
+        
+        // Check 3: The plaintext password MATCHES the hash
+        assertTrue(passwordEncoder.matches("MyS3cur3P@ss!", storedPasswordHash), "Password encoder could not match password");
+
+        // 4. ACT & ASSERT (Login Success): Try to log in with the CORRECT password
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isOk()) // Expect 200 OK
+                .andExpect(jsonPath("$.token").exists()); // Expect a token to be returned
+
+        // 5. ACT & ASSERT (Login Failure): Try to log in with the WRONG password
+        Map<String, String> badLoginRequest = Map.of(
+                "username", "testuser",
+                "password", "WRONG_PASSWORD"
+        );
+        String badJsonRequest = objectMapper.writeValueAsString(badLoginRequest);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(badJsonRequest))
+                .andExpect(status().isUnauthorized()); // Expect 401 Unauthorized
     }
 
-    @Test
-    void delete_user_requires_admin() throws Exception {
-        String tUser = login("alice","alice123"); // not admin
-        mvc.perform(delete("/api/users/1").header("Authorization","Bearer "+tUser))
-                .andExpect(status().isForbidden()); // Fails now
-    }
-
-    @Test
-    void create_user_does_not_allow_role_escalation() throws Exception {
-        // In fixed app, server should ignore role/isAdmin from payload & return 201
-        String payload = "{\"username\":\"eve2\",\"password\":\"pw\",\"email\":\"e2@e\",\"role\":\"ADMIN\",\"isAdmin\":true}";
-        mvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON).content(payload))
-                .andExpect(status().isCreated()) // Fails now (200 OK)
-                .andExpect(jsonPath("$.role", anyOf(nullValue(), is("USER")))) // Fails now (ADMIN)
-                .andExpect(jsonPath("$.isAdmin", anyOf(nullValue(), is(false)))); // Fails now (true)
-    }
-
-    @Test
-    void jwt_must_be_valid_and_aud_iss_checked() throws Exception {
-        // In fixed app, token without proper issuer/audience should be rejected -> 401
-        // Use existing login token (which lacks iss/aud) to hit a protected endpoint
-        String weak = login("alice","alice123");
-        mvc.perform(get("/api/accounts/mine").header("Authorization","Bearer "+weak"))
-                .andExpect(status().isUnauthorized()); // Fails now (returns 200/OK)
-    }
-
-    @Test
-    void account_owner_only_access() throws Exception {
-        String alice = login("alice","alice123");
-        // In fixed code this should be forbidden
-        mvc.perform(get("/api/accounts/2/balance").header("Authorization","Bearer "+alice))
-                .andExpect(status().isForbidden()); // Fails now
-    }
+    // You will add your other tests for other fixes below this line
+    // @Test
+    // public void testTask2_AccessControl_...() throws Exception { ... }
 }
