@@ -7,6 +7,10 @@ import edu.nu.owaspapivulnlab.model.AppUser;
 import edu.nu.owaspapivulnlab.repo.AppUserRepository;
 import edu.nu.owaspapivulnlab.service.JwtService;
 
+// vvv ADD THIS IMPORT vvv
+import org.springframework.security.crypto.password.PasswordEncoder;
+// ^^^ ADD THIS IMPORT ^^^
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,10 +19,13 @@ import java.util.Map;
 public class AuthController {
     private final AppUserRepository users;
     private final JwtService jwt;
+    private final PasswordEncoder passwordEncoder; // <-- 1. ADD THIS FIELD
 
-    public AuthController(AppUserRepository users, JwtService jwt) {
+    // 2. UPDATE THIS CONSTRUCTOR
+    public AuthController(AppUserRepository users, JwtService jwt, PasswordEncoder passwordEncoder) {
         this.users = users;
         this.jwt = jwt;
+        this.passwordEncoder = passwordEncoder; // <-- ADD THIS LINE
     }
 
     public static class LoginReq {
@@ -53,15 +60,47 @@ public class AuthController {
         public String getToken() { return token; }
         public void setToken(String token) { this.token = token; }
     }
+    
+    // vvv 3. ADD THIS ENTIRE /signup METHOD vvv
+    // This method was missing but is required for the assignment
+    @PostMapping("/signup")
+    public ResponseEntity<?> signup(@RequestBody LoginReq request) {
+        if (users.findByUsername(request.username()).isPresent()) {
+            return ResponseEntity.status(400).body("{\"error\": \"username already taken\"}");
+        }
+
+        // VULNERABILITY (Plaintext Password) - FIXED
+        AppUser newUser = AppUser.builder()
+                .username(request.username())
+                // FIX: Hash the password using the encoder
+                .password(passwordEncoder.encode(request.password()))
+                .role("USER")
+                .build();
+        
+        users.save(newUser);
+        
+        return ResponseEntity.status(201).body("{\"message\": \"user created\"}");
+    }
+    // ^^^ END OF NEW /signup METHOD ^^^
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginReq req) {
-        // VULNERABILITY(API2: Broken Authentication): plaintext password check, no lockout/rate limit/MFA
+        // VULNERABILITY(API2: Broken Authentication): plaintext password check
         AppUser user = users.findByUsername(req.username()).orElse(null);
-        if (user != null && user.getPassword().equals(req.password())) {
+
+        // vvv 4. UPDATE THIS IF-STATEMENT vvv
+        
+        // VULNERABLE CODE:
+        // if (user != null && user.getPassword().equals(req.password())) {
+        
+        // FIXED CODE:
+        // Use passwordEncoder.matches() to securely compare the hashes
+        if (user != null && passwordEncoder.matches(req.password(), user.getPassword())) {
+            // ^^^ END OF CHANGE ^^^
+            
             Map<String, Object> claims = new HashMap<>();
             claims.put("role", user.getRole());
-            claims.put("isAdmin", user.isAdmin()); // VULN: trusts client-side role later
+            claims.put("isAdmin", user.isAdmin()); 
             String token = jwt.issue(user.getUsername(), claims);
             return ResponseEntity.ok(new TokenRes(token));
         }

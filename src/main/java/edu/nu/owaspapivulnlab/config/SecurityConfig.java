@@ -5,7 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Bean; // <-- This import is already here, which is good.
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,6 +19,12 @@ import io.jsonwebtoken.*;
 
 import java.io.IOException;
 import java.util.Collections;
+
+// vvv ADD THESE TWO IMPORTS vvv
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+// ^^^ ADD THESE TWO IMPORTS ^^^
+
 
 @Configuration
 public class SecurityConfig {
@@ -45,6 +51,14 @@ public class SecurityConfig {
         http.addFilterBefore(new JwtFilter(secret), org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
+
+    // vvv ADD THIS NEW METHOD HERE vvv
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+    // ^^^ END OF NEW METHOD ^^^
+
 
     // Minimal JWT filter (VULNERABILITY: weak validation - no audience, issuer checks; long TTL)
     static class JwtFilter extends OncePerRequestFilter {
