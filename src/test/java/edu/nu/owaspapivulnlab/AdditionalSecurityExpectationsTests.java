@@ -245,7 +245,47 @@ public class AdditionalSecurityExpectationsTests {
                 .andExpect(status().isTooManyRequests()); // Expect 429 Too Many Requests
         }
 
-        // You will add your test for Task 6 below this line...
+        /**
+         * Test for Task 6: Mass Assignment (API6)
+         * This test verifies that:
+         * 1. A hacker sends a JSON request with "isAdmin": true.
+         * 2. The /api/users endpoint (the 'create' method) IGNORES this field.
+         * 3. The new user is created as a regular "USER" and NOT an "ADMIN".
+         */
+        @Test
+        public void testTask6_MassAssignment_PreventsAdminCreation() throws Exception {
+        // ARRANGE: Create a malicious JSON request trying to set "isAdmin"
+        String maliciousJson = """
+                {
+                        "username": "hacker",
+                        "password": "hackerpassword123",
+                        "isAdmin": true,
+                        "role": "ADMIN"
+                }
+                """;
+
+        // We also need an authenticated user to perform this action (e.g., alice)
+        SecurityMockMvcRequestPostProcessors.UserRequestPostProcessor alice =
+                user("alice").password("alice123").roles("USER");
+
+        // ACT: Call the 'create' endpoint (/api/users POST)
+        mockMvc.perform(post("/api/users")
+                        .with(alice) // <-- Need to be authenticated to create a user
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(maliciousJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("hacker"))
+                .andExpect(jsonPath("$.password").doesNotExist()); // DTO check (Task 4)
+
+        // ASSERT: Check the database to ensure the user is NOT an admin
+        AppUser savedUser = appUserRepository.findByUsername("hacker")
+                .orElseThrow(() -> new AssertionError("User 'hacker' not found in database"));
+
+        assertFalse(savedUser.isAdmin(), "User was created as an ADMIN!");
+        assertEquals("USER", savedUser.getRole(), "User role was not set to USER!");
+        }
+
+// You will add your test for Task 7 below this line...
 
      
 
