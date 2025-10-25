@@ -1,50 +1,35 @@
 package edu.nu.owaspapivulnlab.web;
 
-import org.springframework.dao.DataAccessException;
+import edu.nu.owaspapivulnlab.dto.ErrorDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.HashMap;
-import java.util.Map;
-
-// VULNERABILITY(API7): overly verbose error responses
-@ControllerAdvice
+/**
+ * Catches all unhandled exceptions (Task 8 / API7).
+ * This prevents detailed stack traces from leaking to the client.
+ */
+@RestControllerAdvice
 public class GlobalErrorHandler {
 
-   @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
-   public ResponseEntity<?> handleAccessDenied(org.springframework.security.access.AccessDeniedException e) {
-       Map<String, String> errorMap = new HashMap<>();
-       errorMap.put("error", "Access Denied");
-       errorMap.put("message", e.getMessage());
-       return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorMap);
-   }
+    // 1. Set up a secure, server-side logger
+    private static final Logger log = LoggerFactory.getLogger(GlobalErrorHandler.class);
 
-   @ExceptionHandler(RuntimeException.class)
-   public ResponseEntity<?> handleRuntimeException(RuntimeException e) {
-       Map<String, String> errorMap = new HashMap<>();
-       errorMap.put("error", "Not Found");
-       errorMap.put("message", e.getMessage());
-       return ResponseEntity.status(HttpStatus.NOT_FOUND)
-               .body(errorMap);
-   }
-
-   @ExceptionHandler(DataAccessException.class)
-   public ResponseEntity<?> db(DataAccessException e) {
-       Map<String, String> errorMap = new HashMap<>();
-       errorMap.put("error", "Database Error");
-       errorMap.put("message", "A database error occurred");
-       return ResponseEntity.status(500).body(errorMap);
-   }
-
-   @ExceptionHandler(Exception.class)
-   public ResponseEntity<?> handleAll(Exception e) {
-       Map<String, String> errorMap = new HashMap<>();
-       errorMap.put("error", "Internal Server Error");
-       errorMap.put("message", "An unexpected error occurred");
-       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-               .body(errorMap);
-   }
-
+    /**
+     * This is the "catch-all" handler. It runs for any Exception
+     * that isn't handled by a more specific @ExceptionHandler.
+     */
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR) // Always return a 500
+    public ErrorDTO handleGenericException(Exception ex) {
+        
+        // 2. Log the FULL stack trace on the SERVER for debugging
+        log.error("Unhandled exception caught by GlobalErrorHandler: {}", ex.getMessage(), ex);
+        
+        // 3. Return a GENERIC, safe message to the CLIENT
+        return new ErrorDTO("An internal server error occurred. Please try again later.");
+    }
 }
