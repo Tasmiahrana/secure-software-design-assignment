@@ -1,5 +1,9 @@
 package edu.nu.owaspapivulnlab; // Make sure this package name matches your other files
 
+import io.jsonwebtoken.security.SignatureException;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.context.ApplicationContext;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.nu.owaspapivulnlab.model.AppUser;
 import edu.nu.owaspapivulnlab.model.Account;
@@ -45,6 +49,12 @@ public class AdditionalSecurityExpectationsTests {
 
     @Autowired
     private ObjectMapper objectMapper; // Lets us create JSON strings
+
+   // @Autowired
+    //private org.springframework.context.ApplicationContext applicationContext;
+
+    @Autowired
+    private ApplicationContext applicationContext; // <-- ADD THIS LINE
 
     /**
      * Test for Task 1: Password Security
@@ -285,7 +295,49 @@ public class AdditionalSecurityExpectationsTests {
         assertEquals("USER", savedUser.getRole(), "User role was not set to USER!");
         }
 
-// You will add your test for Task 7 below this line...
+        /**
+         * Test for Task 7: JWT Hardening (API8)
+         * This test verifies that:
+         * 1. The JwtService rejects tokens that are expired.
+         * 2. The JwtService rejects tokens with an invalid issuer.
+         * 3. The JwtService rejects tokens with a weak/wrong signature.
+         */
+        @Test
+        public void testTask7_JWTHardening_RejectsInvalidAndExpiredTokens() throws Exception {
+                // ARRANGE: Get the real JwtService to test its parse() method
+                edu.nu.owaspapivulnlab.service.JwtService jwtService = 
+                        (edu.nu.owaspapivulnlab.service.JwtService) applicationContext.getBean("jwtService");
+
+              // TEST 1: Assert that an EXPIRED token is rejected
+        // This token is signed with your CORRECT key, but expired in 2024.
+        // vvv REPLACE THIS LINE vvv
+        String expiredToken = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJteS1hcGkiLCJhdWQiOiJteS1hcHAiLCJpYXQiOjE3MTUxMjA0MTYsImV4cCI6MTcxNTEyMTMxNn0.O3WADNkQn3-2e2g_zJ2a_p-e-s";
+
+        assertThrows(io.jsonwebtoken.ExpiredJwtException.class, () -> {
+        jwtService.parse(expiredToken);
+        }, "JwtService did not throw ExpiredJwtException for an expired token.");
+
+        // TEST 2: Assert that a token with an INVALID ISSUER is rejected
+        // This token is signed with your CORRECT key, but "iss" is "wrong-issuer"
+        // vvv REPLACE THIS LINE vvv
+        String badIssuerToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSIsImlzcyI6Indyb25nLWlzc3VlciIsImF1ZCI6Im15LWFwcCIsImlhdCI6MTc0NzE1MjE0NSwiZXhwIjoyOTQ3MTUxMjA1fQ.a-A-a-A-a-A-a-A-a-A-a-A-a-A-a-A-a-A-a-A-a-A";
+
+        assertThrows(io.jsonwebtoken.IncorrectClaimException.class, () -> {
+        jwtService.parse(badIssuerToken);
+        }, "JwtService did not throw IncorrectClaimException for a bad issuer.");
+
+        // TEST 3: Assert that a token signed with the OLD WEAK KEY is rejected
+        // This token is signed with "weaksecretkey"
+        // vvv REPLACE THIS LINE vvv
+        String weakSignatureToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSIsImlzcyI6Im15LWFwaSIsImF1ZCI6Im15LWFwcCIsImlhdCI6MTc0NzE1MjE0NSwiZXhwIjoyOTQ3MTUxMjA1fQ.b-C-b-C-b-C-b-C-b-C-b-C-b-C-b-C-b-C-b-C";
+
+        assertThrows(io.jsonwebtoken.security.SignatureException.class, () -> {
+        jwtService.parse(weakSignatureToken);
+        }, "JwtService did not throw SignatureException for an old, weak signature.");
+        }
+
+        
+    // You will add your test for Task 8 below this line...
 
      
 

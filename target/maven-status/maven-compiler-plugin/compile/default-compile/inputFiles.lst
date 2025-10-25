@@ -1,6 +1,7 @@
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\web\GlobalErrorHandler.java
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\web\AdminController.java
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\dto\AccountDTO.java
+C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\dto\SignupRequest.java
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\model\AppUser.java
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\service\JwtService.java
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\repo\AccountRepository.java
