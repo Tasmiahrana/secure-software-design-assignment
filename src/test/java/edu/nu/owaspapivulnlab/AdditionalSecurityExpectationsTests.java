@@ -15,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -336,8 +337,46 @@ public class AdditionalSecurityExpectationsTests {
         }, "JwtService did not throw SignatureException for an old, weak signature.");
         }
 
+        /**
+         * Test for Task 8: Error Handling (API7)
+         * This test verifies that:
+         * 1. We force an internal error (a NullPointerException).
+         * 2. The GlobalErrorHandler catches it and returns a 500 status.
+         * 3. The JSON response is the generic, safe ErrorDTO message.
+         * 4. The response does NOT contain sensitive details like "stackTrace" or "NullPointerException".
+         */
+        @Test
+        public void testTask8_ErrorHandling_PreventsStackTraceLeak() throws Exception {
+        // ARRANGE: Get the real AccountController to inject a 'null' repository
+        edu.nu.owaspapivulnlab.web.AccountController accountController =
+                (edu.nu.owaspapivulnlab.web.AccountController) applicationContext.getBean("accountController");
+
+        // Force a NullPointerException by setting one of its repositories to null
+        ReflectionTestUtils.setField(accountController, "users", null);
+
+        // We need an authenticated user to even hit the endpoint
+        SecurityMockMvcRequestPostProcessors.UserRequestPostProcessor alice =
+                user("alice").password("alice123").roles("USER");
+
+        // ACT & ASSERT: Call the 'mine' endpoint, which will now crash
+        mockMvc.perform(get("/api/accounts/mine").with(alice))
+                .andExpect(status().isInternalServerError()) // Expect 500
+
+                // ASSERT SAFE RESPONSE
+                .andExpect(jsonPath("$.error").value("An internal server error occurred. Please try again later."))
+
+                // ASSERT SENSITIVE DATA DOES NOT EXIST
+                .andExpect(jsonPath("$.trace").doesNotExist())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andExpect(jsonPath("$.message").doesNotExist()) // We only want "error"
+                .andExpect(jsonPath("$.exception").doesNotExist());
+
+        // Cleanup: Set the repository back so other tests don't fail
+        ReflectionTestUtils.setField(accountController, "users", appUserRepository);
+        }
+
+// You will add your test for Task 9 below this line...
         
-    // You will add your test for Task 8 below this line...
 
      
 
