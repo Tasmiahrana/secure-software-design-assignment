@@ -40,9 +40,16 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(reg -> reg
                 .requestMatchers("/api/auth/**", "/h2-console/**").permitAll()
-                // VULNERABILITY: broad permitAll on GET allows data scraping (API1/2 depending on context)
-                .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
+
+                 // FIX: The vulnerable line below is now DELETED.
+                // .requestMatchers(HttpMethod.GET, "/api/**").permitAll() 
+        
+                // Enforce role-based access
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/users/**").hasAnyRole("ADMIN", "USER") // <-- NEW
+                .requestMatchers("/api/accounts/**").hasAnyRole("ADMIN", "USER") // <-- NEW
+
+                // Require authentication for all other /api/ endpoints
                 .anyRequest().authenticated()
         );
 
