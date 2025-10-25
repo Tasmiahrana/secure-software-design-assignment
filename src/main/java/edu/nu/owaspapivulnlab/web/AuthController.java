@@ -14,6 +14,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.Deque;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -91,17 +95,47 @@ public class AuthController {
 
     // Login method remains the same for Task 4
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginReq req) {
+    public ResponseEntity<?> login(@RequestBody LoginReq req, HttpServletRequest request) {
+        // Simple in-memory rate limiter keyed by remote address to block brute-force attempts.
+        // This is intentionally small and suitable for tests/demo; in production use a distributed store.
+        String key = request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
+        long now = System.currentTimeMillis();
+
+        // Create the deque for this key if missing
+        failedAttempts.computeIfAbsent(key, k -> new ConcurrentLinkedDeque<>());
+        Deque<Long> dq = failedAttempts.get(key);
+
+        // Remove entries older than 1 minute
+        long windowMs = 60 * 1000L;
+        synchronized (dq) {
+            while (!dq.isEmpty() && (now - dq.peekFirst()) > windowMs) {
+                dq.pollFirst();
+            }
+            // If already exceeded capacity (5), return 429
+            if (dq.size() >= 5) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(null);
+            }
+        }
+
         AppUser user = users.findByUsername(req.username()).orElse(null);
 
         if (user != null && passwordEncoder.matches(req.password(), user.getPassword())) {
+            // Successful login -> clear failed attempts for this key
+            dq.clear();
             Map<String, Object> claims = new HashMap<>();
             claims.put("role", user.getRole());
             claims.put("isAdmin", user.isAdmin());
             String token = jwt.issue(user.getUsername(), claims);
             return ResponseEntity.ok(new TokenRes(token));
         }
-        // Consider returning a structured error DTO here too
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null); // Return null body or error DTO
+
+        // Failed login -> record timestamp and return 401 (or 429 next time)
+        synchronized (dq) {
+            dq.addLast(now);
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
     }
+
+    // Simple in-memory structure to record failed login timestamps per remote address
+    private final ConcurrentHashMap<String, Deque<Long>> failedAttempts = new ConcurrentHashMap<>();
 }

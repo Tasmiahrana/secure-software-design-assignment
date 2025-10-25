@@ -214,7 +214,38 @@ public class AdditionalSecurityExpectationsTests {
                 .andExpect(jsonPath("$.ownerUserId").doesNotExist());
         }
 
-        // You will add your test for Task 5 below this line...
+        /**
+         * Test for Task 5: Rate Limiting (API4)
+         * This test verifies that:
+         * 1. A user can make a few login attempts.
+         * 2. After 5 attempts, the 6th attempt is blocked with an HTTP 429 "Too Many Requests".
+         * This test MUST run last, so we give it a lower priority.
+         */
+        @Test
+        public void testTask5_RateLimiting_BlocksExcessiveLoginAttempts() throws Exception {
+        // ARRANGE: Create a bad login request
+        Map<String, String> badLoginRequest = Map.of(
+                "username", "testuser",
+                "password", "WRONG_PASSWORD"
+        );
+        String jsonRequest = objectMapper.writeValueAsString(badLoginRequest);
+
+        // ACT: Attempt to log in 5 times (these should be allowed but fail auth)
+        for (int i = 0; i < 5; i++) {
+                mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(jsonRequest))
+                        .andExpect(status().isUnauthorized()); // Expect 401 Unauthorized
+        }
+
+        // ASSERT: The 6th attempt should be blocked by the rate limiter
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isTooManyRequests()); // Expect 429 Too Many Requests
+        }
+
+        // You will add your test for Task 6 below this line...
 
      
 
