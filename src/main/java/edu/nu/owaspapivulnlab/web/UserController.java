@@ -1,5 +1,8 @@
 package edu.nu.owaspapivulnlab.web;
 
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,10 +22,25 @@ public class UserController {
         this.users = users;
     }
 
-    // VULNERABILITY(API1: BOLA/IDOR) - no ownership check, any authenticated OR anonymous GET (due to SecurityConfig) can fetch any user
-    @GetMapping("/{id}")
-    public AppUser get(@PathVariable Long id) {
-        return users.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
+    // FIXED CODE
+    @GetMapping("/{userId}")
+    public AppUser getUserById(@PathVariable Long userId, java.security.Principal principal) {
+
+        // Find the user who is logged in
+        AppUser loggedInUser = users.findByUsername(principal.getName())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+
+        // Find the user they are trying to access
+        AppUser requestedUser = users.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        // FIX (API1: BOLA): Enforce ownership or admin role
+        if (loggedInUser.getId().equals(requestedUser.getId()) || loggedInUser.isAdmin()) {
+            return requestedUser; // OK: User is admin OR is requesting their own info
+        }
+
+        // If not, deny access
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN); // 403 Forbidden
     }
 
     // VULNERABILITY(API6: Mass Assignment) - binds role/isAdmin from client
