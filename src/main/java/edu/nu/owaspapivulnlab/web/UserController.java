@@ -2,6 +2,9 @@ package edu.nu.owaspapivulnlab.web;
 
 import edu.nu.owaspapivulnlab.dto.UserDTO; // This import is correct
 
+import edu.nu.owaspapivulnlab.dto.SignupRequest;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
@@ -19,11 +22,13 @@ import java.util.stream.Collectors; // <-- ADD THIS IMPORT
 
 @RestController
 @RequestMapping("/api/users")
-public class UserController {
+public class UserController { 
     private final AppUserRepository users;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserController(AppUserRepository users) {
+    public UserController(AppUserRepository users, PasswordEncoder passwordEncoder) {
         this.users = users;
+        this.passwordEncoder = passwordEncoder;
     }
 
     // vvv FIX (API3): Changed return type to ResponseEntity<UserDTO> vvv
@@ -49,12 +54,22 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
     }
 
-    // vvv FIX (API3): Changed return type to UserDTO vvv
-    // VULNERABILITY(API6: Mass Assignment) - still vulnerable, but exposure is fixed
+    // vvv THIS ENTIRE METHOD IS NOW FIXED (API6: Mass Assignment) vvv
     @PostMapping
-    public UserDTO create(@Valid @RequestBody AppUser body) {
-        AppUser savedUser = users.save(body);
-        // vvv FIX (API3): Return the safe DTO, not the full entity vvv
+    public UserDTO create(@Valid @RequestBody SignupRequest req) {
+
+        // FIX: We manually build the AppUser from the safe DTO.
+        // We only use the 'username' and 'password' fields.
+        // We IGNORE any other fields (like 'isAdmin' or 'role') 
+        // that a hacker might try to send.
+        AppUser newUser = AppUser.builder()
+                .username(req.username())
+                .password(passwordEncoder.encode(req.password()))
+                .role("USER")       // We set the role manually (SAFE)
+                .isAdmin(false)     // We set isAdmin manually (SAFE)
+                .build();
+
+        AppUser savedUser = users.save(newUser);
         return UserDTO.fromEntity(savedUser);
     }
 

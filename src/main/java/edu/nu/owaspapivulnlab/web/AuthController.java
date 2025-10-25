@@ -1,6 +1,7 @@
 package edu.nu.owaspapivulnlab.web;
 
 import edu.nu.owaspapivulnlab.dto.UserDTO; // This import is correct
+import edu.nu.owaspapivulnlab.dto.SignupRequest;
 
 import jakarta.validation.Valid; // <-- ADD THIS IMPORT
 import jakarta.validation.constraints.NotBlank;
@@ -31,22 +32,6 @@ public class AuthController {
         this.users = users;
         this.jwt = jwt;
         this.passwordEncoder = passwordEncoder;
-    }
-
-    // Renamed LoginReq to SignupRequest for clarity, added @Valid
-    public static class SignupRequest {
-        @NotBlank
-        private String username;
-        @NotBlank
-        private String password;
-
-        // Constructor, getters, setters are the same...
-        public SignupRequest() {}
-        public SignupRequest(String username, String password) { this.username = username; this.password = password; }
-        public String username() { return username; }
-        public String password() { return password; }
-        public void setUsername(String username) { this.username = username; }
-        public void setPassword(String password) { this.password = password; }
     }
 
     // Login Request class (same as before)
