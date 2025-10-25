@@ -1,5 +1,7 @@
 package edu.nu.owaspapivulnlab.web;
 
+import edu.nu.owaspapivulnlab.dto.UserDTO; // This import is correct
+
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
@@ -13,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors; // <-- ADD THIS IMPORT
 
 @RestController
 @RequestMapping("/api/users")
@@ -23,9 +26,9 @@ public class UserController {
         this.users = users;
     }
 
-    // FIXED CODE
+    // vvv FIX (API3): Changed return type to ResponseEntity<UserDTO> vvv
     @GetMapping("/{userId}")
-    public ResponseEntity<AppUser> getUserById(@PathVariable("userId") Long userId, Authentication auth) {
+    public ResponseEntity<UserDTO> getUserById(@PathVariable("userId") Long userId, Authentication auth) {
 
         // Find the user who is logged in
         AppUser loggedInUser = users.findByUsername(auth.getName())
@@ -37,32 +40,44 @@ public class UserController {
 
         // FIX (API1: BOLA): Enforce ownership or admin role
         if (loggedInUser.getId().equals(requestedUser.getId()) || loggedInUser.isAdmin()) {
-            return ResponseEntity.ok(requestedUser); // OK: User is admin OR is requesting their own info
+            
+            // vvv FIX (API3): Return the safe DTO, not the full entity vvv
+            return ResponseEntity.ok(UserDTO.fromEntity(requestedUser)); // OK: User is admin OR is requesting their own info
         }
 
         // If not, deny access explicitly with a 403 response
         return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
     }
 
-    // VULNERABILITY(API6: Mass Assignment) - binds role/isAdmin from client
+    // vvv FIX (API3): Changed return type to UserDTO vvv
+    // VULNERABILITY(API6: Mass Assignment) - still vulnerable, but exposure is fixed
     @PostMapping
-    public AppUser create(@Valid @RequestBody AppUser body) {
-        return users.save(body);
+    public UserDTO create(@Valid @RequestBody AppUser body) {
+        AppUser savedUser = users.save(body);
+        // vvv FIX (API3): Return the safe DTO, not the full entity vvv
+        return UserDTO.fromEntity(savedUser);
     }
 
-    // VULNERABILITY(API9: Improper Inventory + API8 Injection style): naive 'search' that can be abused for enumeration
+    // vvv FIX (API3): Changed return type to List<UserDTO> vvv
+    // VULNERABILITY(API9: Improper Inventory + API8 Injection style): still vulnerable
     @GetMapping("/search")
-    public List<AppUser> search(@RequestParam String q) {
-        return users.search(q);
+    public List<UserDTO> search(@RequestParam String q) {
+        // vvv FIX (API3): Map results to the safe DTO vvv
+        return users.search(q).stream()
+                .map(UserDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 
-    // VULNERABILITY(API3: Excessive Data Exposure) - returns all users including sensitive fields
+    // vvv FIX (API3): Changed return type to List<UserDTO> vvv
     @GetMapping
-    public List<AppUser> list() {
-        return users.findAll();
+    public List<UserDTO> list() {
+        // vvv FIX (API3): Map results to the safe DTO vvv
+        return users.findAll().stream()
+                .map(UserDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 
-    // VULNERABILITY(API5: Broken Function Level Authorization) - allows regular users to delete anyone
+    // This endpoint is fine, no changes needed for Task 4
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable("id") Long id) {
         users.deleteById(id);
