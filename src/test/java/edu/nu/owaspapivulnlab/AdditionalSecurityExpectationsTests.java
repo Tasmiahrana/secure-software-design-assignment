@@ -2,7 +2,9 @@ package edu.nu.owaspapivulnlab; // Make sure this package name matches your othe
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.nu.owaspapivulnlab.model.AppUser;
+import edu.nu.owaspapivulnlab.model.Account;
 import edu.nu.owaspapivulnlab.repo.AppUserRepository;
+import edu.nu.owaspapivulnlab.repo.AccountRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -11,6 +13,9 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 import java.util.Map;
 
@@ -31,6 +36,9 @@ public class AdditionalSecurityExpectationsTests {
 
     @Autowired
     private AppUserRepository appUserRepository; // Lets us check the database
+
+    @Autowired
+    private AccountRepository accountRepository; // Lets us check accounts
 
     @Autowired
     private PasswordEncoder passwordEncoder; // Lets us check the hash
@@ -109,10 +117,57 @@ public class AdditionalSecurityExpectationsTests {
         // without providing an Authorization token.
         mockMvc.perform(get("/api/users"))
                 // FIXED TEST CODE
+                // CORRECT CODE
                 .andExpect(status().isForbidden()); // Expect 403 Forbidden
         }
 
-        // You will add your test for Task 3 below this line...
+                /**
+         * Test for Task 3: BOLA/IDOR
+         * This test verifies that a non-admin user ("alice"):
+         * 1. CAN access her own user data.
+         * 2. CANNOT access another user's ("bob") data.
+         * 3. CAN access her own account balance.
+         * 4. CANNOT access another user's ("bob") account balance.
+         */
+        @Test
+        public void testTask3_BOLA_PreventsAccessToOtherUserData() throws Exception {
+        // ARRANGE: Create a mock authenticated user "alice" (ID 1, Role USER)
+        SecurityMockMvcRequestPostProcessors.UserRequestPostProcessor alice =
+                user("alice").password("alice123").roles("USER");
+
+        // Ensure alice and bob exist in the database
+        AppUser aliceUser = appUserRepository.findByUsername("alice")
+                .orElseThrow(() -> new AssertionError("Alice not found"));
+        AppUser bobUser = appUserRepository.findByUsername("bob")
+                .orElseThrow(() -> new AssertionError("Bob not found"));
+
+        // Ensure accounts exist
+        Account aliceAccount = accountRepository.findByOwnerUserId(aliceUser.getId())
+                .stream().findFirst()
+                .orElseThrow(() -> new AssertionError("Alice's account not found"));
+        Account bobAccount = accountRepository.findByOwnerUserId(bobUser.getId())
+                .stream().findFirst()
+                .orElseThrow(() -> new AssertionError("Bob's account not found"));
+
+        // TEST 1: Alice CAN get her own user info (User ID 1)
+        mockMvc.perform(get("/api/users/" + aliceUser.getId()).with(alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("alice"));
+
+        // TEST 2: Alice CANNOT get Bob's user info (User ID 2)
+        mockMvc.perform(get("/api/users/" + bobUser.getId()).with(alice))
+                .andExpect(status().isForbidden()); // Expect 403 Forbidden
+
+        // TEST 3: Alice CAN get her own account balance (Account ID 1)
+        mockMvc.perform(get("/api/accounts/" + aliceAccount.getId() + "/balance").with(alice))
+                .andExpect(status().isOk());
+
+        // TEST 4: Alice CANNOT get Bob's account balance (Account ID 2)
+        mockMvc.perform(get("/api/accounts/" + bobAccount.getId() + "/balance").with(alice))
+                .andExpect(status().isForbidden()); // Expect 403 Forbidden
+        }
+
+        // You will add your test for Task 4 below this line...
 
     // You will add your other tests for other fixes below this line
     // @Test

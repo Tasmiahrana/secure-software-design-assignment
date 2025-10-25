@@ -11,7 +11,6 @@ import edu.nu.owaspapivulnlab.repo.AppUserRepository;
 // vvv ADD THESE IMPORTS vvv
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
-import java.security.Principal;
 // ^^^ END OF IMPORTS ^^^
 
 import java.util.Collections;
@@ -33,22 +32,23 @@ public class AccountController {
 
     // vvv THIS METHOD IS NOW FIXED vvv
     @GetMapping("/{id}/balance")
-    public Double balance(@PathVariable Long id, Principal principal) {
+    public ResponseEntity<Double> balance(@PathVariable("id") Long id, Authentication auth) {
         // Find who is logged in
-        AppUser loggedInUser = users.findByUsername(principal.getName())
+        AppUser loggedInUser = users.findByUsername(auth.getName())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        
+
         // Find the account they want to see
         Account a = accounts.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
 
         // FIX (API1: BOLA): Enforce ownership or admin role
-        if (a.getAppUser().getId().equals(loggedInUser.getId()) || loggedInUser.isAdmin()) {
-            return a.getBalance(); // OK
+        if (a.getOwnerUserId().equals(loggedInUser.getId()) || loggedInUser.isAdmin())
+        {
+            return ResponseEntity.ok(a.getBalance()); // OK
         }
-        
-        // If not the owner or admin, deny access
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+
+        // If not the owner or admin, deny access explicitly with a 403 response
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
     }
     // ^^^ END OF FIXED METHOD ^^^
 
@@ -56,10 +56,10 @@ public class AccountController {
     // vvv THIS METHOD IS NOW FIXED vvv
     // VULNERABILITY(API4: Unrestricted Resource Consumption) - still vulnerable, fixed in a later task
     @PostMapping("/{id}/transfer")
-    public ResponseEntity<?> transfer(@PathVariable Long id, @RequestParam Double amount, Principal principal) {
-        
+    public ResponseEntity<?> transfer(@PathVariable("id") Long id, @RequestParam Double amount, Authentication auth) {
+
         // Find who is logged in
-        AppUser loggedInUser = users.findByUsername(principal.getName())
+        AppUser loggedInUser = users.findByUsername(auth.getName())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
         // Find the account they want to use
@@ -67,17 +67,18 @@ public class AccountController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
 
         // FIX (API1/API5: BOLA): Enforce ownership or admin role
-        if (!a.getAppUser().getId().equals(loggedInUser.getId()) && !loggedInUser.isAdmin()) {
+        if (!a.getOwnerUserId().equals(loggedInUser.getId()) && !loggedInUser.isAdmin())
+        {
             // Deny access if NOT the owner and NOT an admin
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
         // --- Ownership check passed, proceed with transfer ---
-        
+
         // (This is still vulnerable to API4/API9, but the BOLA/IDOR is fixed)
         a.setBalance(a.getBalance() - amount);
         accounts.save(a);
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("status", "ok");
         response.put("remaining", a.getBalance());

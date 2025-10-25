@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import edu.nu.owaspapivulnlab.model.AppUser;
 import edu.nu.owaspapivulnlab.repo.AppUserRepository;
+import org.springframework.security.core.Authentication;
 
 import java.util.HashMap;
 import java.util.List;
@@ -24,10 +25,10 @@ public class UserController {
 
     // FIXED CODE
     @GetMapping("/{userId}")
-    public AppUser getUserById(@PathVariable Long userId, java.security.Principal principal) {
+    public ResponseEntity<AppUser> getUserById(@PathVariable("userId") Long userId, Authentication auth) {
 
         // Find the user who is logged in
-        AppUser loggedInUser = users.findByUsername(principal.getName())
+        AppUser loggedInUser = users.findByUsername(auth.getName())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
         // Find the user they are trying to access
@@ -36,11 +37,11 @@ public class UserController {
 
         // FIX (API1: BOLA): Enforce ownership or admin role
         if (loggedInUser.getId().equals(requestedUser.getId()) || loggedInUser.isAdmin()) {
-            return requestedUser; // OK: User is admin OR is requesting their own info
+            return ResponseEntity.ok(requestedUser); // OK: User is admin OR is requesting their own info
         }
 
-        // If not, deny access
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN); // 403 Forbidden
+        // If not, deny access explicitly with a 403 response
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
     }
 
     // VULNERABILITY(API6: Mass Assignment) - binds role/isAdmin from client
@@ -63,7 +64,7 @@ public class UserController {
 
     // VULNERABILITY(API5: Broken Function Level Authorization) - allows regular users to delete anyone
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable Long id) {
+    public ResponseEntity<?> delete(@PathVariable("id") Long id) {
         users.deleteById(id);
         Map<String, String> response = new HashMap<>();
         response.put("status", "deleted");
