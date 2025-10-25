@@ -14,10 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -92,7 +94,25 @@ public class AdditionalSecurityExpectationsTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(badJsonRequest))
                 .andExpect(status().isUnauthorized()); // Expect 401 Unauthorized
-    }
+        }
+
+        /**
+         * Test for Task 2: Access Control
+         * This test verifies that:
+         * 1. Unauthenticated users can NO LONGER access /api/** endpoints.
+         * 2. It specifically checks that /api/users is now protected.
+         */
+        @Test
+        public void testTask2_AccessControl_BlocksUnauthenticatedAccess() throws Exception {
+        // ACT & ASSERT
+        // Try to access a protected API endpoint (GET /api/users)
+        // without providing an Authorization token.
+        mockMvc.perform(get("/api/users"))
+                // FIXED TEST CODE
+                .andExpect(status().isForbidden()); // Expect 403 Forbidden
+        }
+
+        // You will add your test for Task 3 below this line...
 
     // You will add your other tests for other fixes below this line
     // @Test
