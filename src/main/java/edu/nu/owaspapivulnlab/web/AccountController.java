@@ -8,9 +8,14 @@ import edu.nu.owaspapivulnlab.model.AppUser;
 import edu.nu.owaspapivulnlab.repo.AccountRepository;
 import edu.nu.owaspapivulnlab.repo.AppUserRepository;
 
-// vvv ADD THESE IMPORTS vvv
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
+
+// vvv ADD THESE IMPORTS FOR TASK 4 vvv
+import edu.nu.owaspapivulnlab.dto.AccountDTO;
+import java.security.Principal;
+import java.util.List;
+import java.util.stream.Collectors;
 // ^^^ END OF IMPORTS ^^^
 
 import java.util.Collections;
@@ -24,17 +29,17 @@ public class AccountController {
     private final AccountRepository accounts;
     private final AppUserRepository users;
 
-    // This constructor is already correct.
+    // This constructor is correct.
     public AccountController(AccountRepository accounts, AppUserRepository users) {
         this.accounts = accounts;
         this.users = users;
     }
 
-    // vvv THIS METHOD IS NOW FIXED vvv
+    // vvv FIX (API3): Changed return type from Double to AccountDTO vvv
     @GetMapping("/{id}/balance")
-    public ResponseEntity<Double> balance(@PathVariable("id") Long id, Authentication auth) {
+    public AccountDTO balance(@PathVariable("id") Long id, Principal principal) { // <-- Changed return type
         // Find who is logged in
-        AppUser loggedInUser = users.findByUsername(auth.getName())
+        AppUser loggedInUser = users.findByUsername(principal.getName())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
         // Find the account they want to see
@@ -44,22 +49,22 @@ public class AccountController {
         // FIX (API1: BOLA): Enforce ownership or admin role
         if (a.getOwnerUserId().equals(loggedInUser.getId()) || loggedInUser.isAdmin())
         {
-            return ResponseEntity.ok(a.getBalance()); // OK
+            // vvv FIX (API3): Return the safe DTO, not just the balance vvv
+            return AccountDTO.fromEntity(a); // OK
         }
 
-        // If not the owner or admin, deny access explicitly with a 403 response
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        // If not the owner or admin, deny access
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
     }
     // ^^^ END OF FIXED METHOD ^^^
 
 
-    // vvv THIS METHOD IS NOW FIXED vvv
-    // VULNERABILITY(API4: Unrestricted Resource Consumption) - still vulnerable, fixed in a later task
+    // vvv FIX (API3): Changed return type to ResponseEntity<AccountDTO> vvv
     @PostMapping("/{id}/transfer")
-    public ResponseEntity<?> transfer(@PathVariable("id") Long id, @RequestParam Double amount, Authentication auth) {
+    public ResponseEntity<AccountDTO> transfer(@PathVariable("id") Long id, @RequestParam Double amount, Principal principal) { // <-- Changed return type
 
         // Find who is logged in
-        AppUser loggedInUser = users.findByUsername(auth.getName())
+        AppUser loggedInUser = users.findByUsername(principal.getName())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
         // Find the account they want to use
@@ -70,27 +75,31 @@ public class AccountController {
         if (!a.getOwnerUserId().equals(loggedInUser.getId()) && !loggedInUser.isAdmin())
         {
             // Deny access if NOT the owner and NOT an admin
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
 
         // --- Ownership check passed, proceed with transfer ---
-
-        // (This is still vulnerable to API4/API9, but the BOLA/IDOR is fixed)
         a.setBalance(a.getBalance() - amount);
         accounts.save(a);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "ok");
-        response.put("remaining", a.getBalance());
-        return ResponseEntity.ok(response);
+        // vvv FIX (API3): Return the safe DTO, not the old Map vvv
+        return ResponseEntity.ok(AccountDTO.fromEntity(a));
     }
     // ^^^ END OF FIXED METHOD ^^^
 
 
-    // Safe-ish helper to view my accounts (still leaks more than needed - Task 4)
+    // vvv FIX (API3): Changed return type from Object to List<AccountDTO> vvv
     @GetMapping("/mine")
-    public Object mine(Authentication auth) {
+    public List<AccountDTO> mine(Authentication auth) { // <-- Changed return type
         AppUser me = users.findByUsername(auth != null ? auth.getName() : "anonymous").orElse(null);
-        return me == null ? Collections.emptyList() : accounts.findByOwnerUserId(me.getId());
+        
+        if (me == null) {
+            return Collections.emptyList();
+        }
+
+        // vvv FIX (API3): Map all accounts to the safe DTO vvv
+        return accounts.findByOwnerUserId(me.getId()).stream()
+                .map(AccountDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 }

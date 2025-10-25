@@ -167,7 +167,56 @@ public class AdditionalSecurityExpectationsTests {
                 .andExpect(status().isForbidden()); // Expect 403 Forbidden
         }
 
-        // You will add your test for Task 4 below this line...
+                /**
+         * Test for Task 4: Excessive Data Exposure
+         * This test verifies that:
+         * 1. The /api/users/{id} endpoint ONLY returns the UserDTO (no password/role).
+         * 2. The /api/auth/signup endpoint ONLY returns the UserDTO (no password/role).
+         * 3. The /api/accounts/{id}/balance endpoint ONLY returns the AccountDTO (no ownerUserId).
+         */
+        @Test
+        public void testTask4_DataExposure_DTOsPreventSensitiveDataLeak() throws Exception {
+        // ARRANGE: Create a mock authenticated user "alice"
+        SecurityMockMvcRequestPostProcessors.UserRequestPostProcessor alice =
+                user("alice").password("alice123").roles("USER");
+
+        // TEST 1: Check the /api/users/{id} endpoint
+        mockMvc.perform(get("/api/users/1").with(alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("alice"))
+                // --- ASSERT SENSITIVE FIELDS DO NOT EXIST ---
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.role").doesNotExist())
+                .andExpect(jsonPath("$.admin").doesNotExist());
+
+        // TEST 2: Check the /api/auth/signup endpoint
+        Map<String, String> signupRequest = Map.of(
+                "username", "dto_test_user",
+                "password", "MyS3cur3P@ss!"
+        );
+        String jsonRequest = objectMapper.writeValueAsString(signupRequest);
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.username").value("dto_test_user"))
+                // --- ASSERT SENSITIVE FIELDS DO NOT EXIST ---
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.role").doesNotExist())
+                .andExpect(jsonPath("$.admin").doesNotExist());
+
+        // TEST 3: Check the /api/accounts/{id}/balance endpoint
+        mockMvc.perform(get("/api/accounts/1/balance").with(alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balance").value(100.0))
+                // --- ASSERT SENSITIVE FIELD DOES NOT EXIST ---
+                .andExpect(jsonPath("$.ownerUserId").doesNotExist());
+        }
+
+        // You will add your test for Task 5 below this line...
+
+     
 
     // You will add your other tests for other fixes below this line
     // @Test
