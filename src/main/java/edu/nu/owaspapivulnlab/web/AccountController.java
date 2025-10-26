@@ -1,5 +1,7 @@
 package edu.nu.owaspapivulnlab.web;
 
+import edu.nu.owaspapivulnlab.dto.ErrorDTO;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -59,9 +61,9 @@ public class AccountController {
     // ^^^ END OF FIXED METHOD ^^^
 
 
-    // vvv FIX (API3): Changed return type to ResponseEntity<AccountDTO> vvv
+    // vvv FIX (API3): Changed return type to ResponseEntity<?> to allow ErrorDTO vvv
     @PostMapping("/{id}/transfer")
-    public ResponseEntity<AccountDTO> transfer(@PathVariable("id") Long id, @RequestParam Double amount, Principal principal) { // <-- Changed return type
+    public ResponseEntity<?> transfer(@PathVariable("id") Long id, @RequestParam Double amount, Principal principal) { // <-- Changed return type to <?>
 
         // Find who is logged in
         AppUser loggedInUser = users.findByUsername(principal.getName())
@@ -78,7 +80,25 @@ public class AccountController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
 
-        // --- Ownership check passed, proceed with transfer ---
+        // -----------------------------------------------------
+        // VULNERABILITY FIX (TASK 9 / API9: Input Validation)
+        // -----------------------------------------------------
+
+        // FIX 1: Reject negative or zero amounts
+        if (amount <= 0) {
+            return ResponseEntity.badRequest()
+                    .body(new ErrorDTO("Amount must be a positive number."));
+        }
+
+        // FIX 2: Reject insufficient funds (cannot go negative)
+        if (a.getBalance() < amount) {
+            return ResponseEntity.badRequest()
+                    .body(new ErrorDTO("Insufficient funds for this transfer."));
+        }
+        
+        // -----------------------------------------------------
+
+        // --- Validation passed, proceed with transfer ---
         a.setBalance(a.getBalance() - amount);
         accounts.save(a);
 
