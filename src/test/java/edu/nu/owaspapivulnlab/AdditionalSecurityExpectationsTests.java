@@ -375,12 +375,45 @@ public class AdditionalSecurityExpectationsTests {
         ReflectionTestUtils.setField(accountController, "users", appUserRepository);
         }
 
-// You will add your test for Task 9 below this line...
-        
+        /**
+         * Test for Task 9: Input Validation (API9)
+         * This test verifies that the /api/accounts/{id}/transfer endpoint rejects:
+         * 1. Negative amounts (which could lead to adding money).
+         * 2. Zero amounts.
+         * 3. Amounts that exceed the current balance (insufficient funds).
+         */
+        @Test
+        public void testTask9_InputValidation_RejectsInvalidTransferAmounts() throws Exception {
+        // ARRANGE: Authenticated user "alice" with a known starting balance (100.0)
+        SecurityMockMvcRequestPostProcessors.UserRequestPostProcessor alice =
+                user("alice").password("alice123").roles("USER");
+        Long aliceAccountId = 1L;
 
-     
+        // TEST 1: Reject negative amount (-50.0)
+        mockMvc.perform(post("/api/accounts/" + aliceAccountId + "/transfer")
+                        .param("amount", "-50.0") // Malicious attempt to credit account
+                        .with(alice))
+                .andExpect(status().isBadRequest()) // Expect 400 Bad Request
+                .andExpect(jsonPath("$.error").value("Amount must be a positive number."));
 
-    // You will add your other tests for other fixes below this line
-    // @Test
-    // public void testTask2_AccessControl_...() throws Exception { ... }
+        // TEST 2: Reject zero amount (0.0)
+        mockMvc.perform(post("/api/accounts/" + aliceAccountId + "/transfer")
+                        .param("amount", "0.0")
+                        .with(alice))
+                .andExpect(status().isBadRequest()) // Expect 400 Bad Request
+                .andExpect(jsonPath("$.error").value("Amount must be a positive number."));
+
+        // TEST 3: Reject amount greater than balance (999.0 > 100.0)
+        mockMvc.perform(post("/api/accounts/" + aliceAccountId + "/transfer")
+                        .param("amount", "999.0")
+                        .with(alice))
+                .andExpect(status().isBadRequest()) // Expect 400 Bad Request
+                .andExpect(jsonPath("$.error").value("Insufficient funds for this transfer."));
+
+        // Final Check: Ensure balance has not changed (still 100.0)
+        mockMvc.perform(get("/api/accounts/" + aliceAccountId + "/balance").with(alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balance").value(100.0));
+        }
+
 }

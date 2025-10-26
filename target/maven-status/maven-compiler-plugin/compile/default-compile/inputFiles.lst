@@ -4,6 +4,7 @@ C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\dto\SignupRequest.java
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\model\AppUser.java
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\service\JwtService.java
+C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\dto\ErrorDTO.java
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\repo\AccountRepository.java
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\OwaspApiVulnLabApplication.java
 C:\Users\tasmi\Downloads\owasp-api-vuln-lab-assignment-03\owasp-api-vuln-lab\src\main\java\edu\nu\owaspapivulnlab\dto\UserDTO.java

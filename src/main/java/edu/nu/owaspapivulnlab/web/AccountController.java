@@ -63,8 +63,8 @@ public class AccountController {
 
     // vvv FIX (API3): Changed return type to ResponseEntity<?> to allow ErrorDTO vvv
     @PostMapping("/{id}/transfer")
-    public ResponseEntity<?> transfer(@PathVariable("id") Long id, @RequestParam Double amount, Principal principal) { // <-- Changed return type to <?>
-
+    // Change 'double' (primitive) to 'Double' (wrapper class)
+    public ResponseEntity<?> transfer(@PathVariable("id") Long id, @RequestParam("amount") Double amount, Principal principal) {
         // Find who is logged in
         AppUser loggedInUser = users.findByUsername(principal.getName())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
@@ -83,6 +83,12 @@ public class AccountController {
         // -----------------------------------------------------
         // VULNERABILITY FIX (TASK 9 / API9: Input Validation)
         // -----------------------------------------------------
+
+        // FIX 0: Check for null amount (This prevents the 500 error if input is malformed or missing)
+        if (amount == null) {
+             return ResponseEntity.badRequest()
+                    .body(new ErrorDTO("Transfer amount must be specified and valid."));
+        }
 
         // FIX 1: Reject negative or zero amounts
         if (amount <= 0) {
